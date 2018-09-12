@@ -1,3 +1,4 @@
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -18,7 +19,8 @@ def plot_confusion_matrix(y, y_pred, normalize=True, **kwargs):
     ax.set_ylabel('Observed')
     ax.set_xlabel('Predicted')
 
-def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
+
+def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, scoring=None,
                         n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
     """Generate a simple plot of the test and training learning curve"""
     plt.figure()
@@ -28,7 +30,7 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
     plt.xlabel("Training examples")
     plt.ylabel("Score")
     train_sizes, train_scores, test_scores = learning_curve(
-        estimator, X, y, cv=cv, n_jobs=n_jobs, train_sizes=train_sizes)
+        estimator, X, y, cv=cv, scoring=scoring, n_jobs=n_jobs, train_sizes=train_sizes)
     train_scores_mean = np.mean(train_scores, axis=1)
     train_scores_std = np.std(train_scores, axis=1)
     test_scores_mean = np.mean(test_scores, axis=1)
