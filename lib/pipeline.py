@@ -2,8 +2,26 @@
 from sklearn.metrics import f1_score, make_scorer
 from sklearn.base import BaseEstimator, TransformerMixin
 
+from.preprocessing import preprocess
+
 # Custom scorer for cross validation
 f1_scorer = make_scorer(f1_score, greater_is_better=True, average='macro')
+
+
+class LazyProcessing(BaseEstimator, TransformerMixin):
+    """
+    Making the preprocessing script a step in the pipeline. This will be gradually split into
+    individual transformers.
+    """
+    def __init__(self):
+        self.preprocess = preprocess
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, data):
+        return preprocess(data)
+
 
 class FeatureExtractor(BaseEstimator, TransformerMixin):
     """
