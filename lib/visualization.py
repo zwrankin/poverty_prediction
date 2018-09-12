@@ -1,9 +1,14 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import warnings
 
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import learning_curve
+from sklearn.model_selection import cross_val_score
+from sklearn.exceptions import ConvergenceWarning
+
 
 def plot_confusion_matrix(y, y_pred, normalize=True, **kwargs):
 
@@ -49,3 +54,44 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, scoring=None
 
     plt.legend(loc="best")
     return plt
+
+
+def cv_model(transformer_pipeline, alg, X_train, y_train, cv, scoring, model_results=None):
+    alg_name = alg.__name__
+    X = transformer_pipeline.fit_transform(X_train)
+    y = y_train
+
+    cv_scores = cross_val_score(alg(), X, y, cv=cv, scoring=scoring, n_jobs=-1)
+    print(f'{alg_name} CV Score: {round(cv_scores.mean(), 5)} with std: {round(cv_scores.std(), 5)}')
+
+    if model_results is not None:
+        model_results = model_results.append(pd.DataFrame({'model': alg_name,
+                                                           'cv_mean': cv_scores.mean(),
+                                                           'cv_std': cv_scores.std()},
+                                                          index=[0]),
+                                             ignore_index=True)
+
+        return model_results
+
+
+def compare_algorithm_cv_scores(transformer_pipeline, algs, X_train, y_train, cv, scoring):
+    # Filter out warnings from models
+    warnings.filterwarnings('ignore', category=ConvergenceWarning)
+    warnings.filterwarnings('ignore', category=DeprecationWarning)
+    warnings.filterwarnings('ignore', category=UserWarning)
+
+    model_results = pd.DataFrame(columns=['model', 'cv_mean', 'cv_std'])
+
+    for alg in algs:
+        model_results = cv_model(transformer_pipeline, alg, X_train, y_train, cv, scoring, model_results)
+
+    return model_results
+
+def plot_algorithm_cv_scores(model_results):
+    model_results.set_index('model', inplace=True)
+    model_results['cv_mean'].plot.bar(color='orange', figsize=(8, 6),
+                                      yerr=list(model_results['cv_std']),
+                                      edgecolor='k', linewidth=2)
+    plt.title('Model F1 Score Results');
+    plt.ylabel('Mean F1 Score (with error bar)');
+    model_results.reset_index(inplace=True)

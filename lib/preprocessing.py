@@ -78,3 +78,18 @@ def preprocess(df):
     # df = map_booleans(df)
 
     return df
+
+
+def load_and_process_training_data():
+    """
+    (somewhat hacky) Convenience function to clean up notebooks
+    :return: two pd.DataFrames, [X_train, y_train]
+    """
+    train = pd.read_csv('../input/train.csv')
+
+    X_train = preprocess(train).drop('Target', axis=1).query(
+        'parentesco1 == 1')  # try subsetting to ONLY train on head of household
+    y_train = train.query('parentesco1 == 1')['Target']  # try subsetting to ONLY train on head of household
+
+    return X_train, y_train
+
