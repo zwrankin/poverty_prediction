@@ -44,15 +44,11 @@ def clean_monthly_rent(df):
     return df
 
 
-def take_max(x):
-    return x.max()
-
-
 def clean_education(df):
     df['no_primary_education'] = df['instlevel1'] + df['instlevel2']
     df['rez_esc_scaled'] = df['rez_esc'] / (df['age'] - 6)  # years behind per year (ages 7-17)
     # Find the max (scaled) years behind in schooling per household
-    df['hh_max_rez_esc_scaled'] = df.groupby('idhogar')['rez_esc_scaled'].transform(take_max)
+    df['hh_max_rez_esc_scaled'] = df.groupby('idhogar')['rez_esc_scaled'].transform(lambda x: x.max())
     return df
 
 
