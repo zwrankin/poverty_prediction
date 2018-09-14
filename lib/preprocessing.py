@@ -30,6 +30,7 @@ def create_housing_index(df):
 
 
 def clean_dependency(df):
+    # Original 'dependency' variable has 'yes' and 'no', so better to calculate it per definition
     df['calc_dependency'] = (df['hogar_nin'] + df['hogar_mayor']) / df['hogar_adul']
     df.loc[df['hogar_adul'] == 0, 'calc_dependency'] = 8  # this is hacky, but original dependency var is 8 when no adults
     df['calc_dependency_bin'] = np.where(df['calc_dependency'] == 0, 0, 1)
@@ -37,14 +38,34 @@ def clean_dependency(df):
 
 
 def clean_monthly_rent(df):
+
     # Fill in households that fully own house with 0 rent payment
     df.loc[(df['tipovivi1'] == 1), 'v2a1'] = 0  # tipovivi1, =1 own and fully paid house
-    df.loc[df['v2a1'].isnull(), 'v2a1-missing'] = 1
     df['v2a1_missing'] = np.where(df['v2a1'].isnull(), 1, 0)
+
+    df['rent_by_hhsize'] = df['v2a1'] / df['hhsize']  # rent by household size
+    df['rent_by_people'] = df['v2a1'] / df['r4t3']  # rent by people in household
+    df['rent_by_rooms'] = df['v2a1'] / df['rooms']  # rent by number of rooms
+    df['rent_by_living'] = df['v2a1'] / df['tamviv']  # rent by number of persons living in the household
+    df['rent_by_minor'] = df['v2a1'] / df['hogar_nin']
+    df['rent_by_adult'] = df['v2a1'] / df['hogar_adul']
+    df['rent_by_dep'] = df['v2a1'] / df['calc_dependency']
+    # df['rent_by_educ'] = df['v2a1'] / df['meaneduc']
+    # df['rent_by_numPhone'] = df['v2a1'] / df['qmobilephone']
+    # df['rent_by_gadgets'] = df['v2a1'] / (df['computer'] + df['mobilephone'] + df['v18q'])
+    # df['rent_by_num_gadgets'] = df['v2a1'] / (df['v18q1'] + df['qmobilephone'])
+    # df['rent_by_appliances'] = df['v2a1'] / df['appliances']
+
+    #Top code at #1 million per whatever (mostly to avoid inf
+    for col in ['rent_by_minor', 'rent_by_adult', 'rent_by_dep']:
+        df.loc[df[col] > 1000000, col] = 1000000
     return df
 
 
 def clean_education(df):
+    # A few individuals (incl heads of hh) have missing meaneduc but nonmissing escolari
+    df.loc[df['meaneduc'].isnull(), 'meaneduc'] = df['escolari']
+
     df['no_primary_education'] = df['instlevel1'] + df['instlevel2']
     df['rez_esc_scaled'] = df['rez_esc'] / (df['age'] - 6)  # years behind per year (ages 7-17)
     # Find the max (scaled) years behind in schooling per household
@@ -67,6 +88,12 @@ def map_booleans(df):
     return df
 
 
+def fit_outliers(df):
+    # According to competition host (https://www.kaggle.com/c/costa-rican-household-poverty-prediction/discussion/61403)
+    # we can safely change the rez_esc value to 5
+    df.loc[df['rez_esc'] == 99.0, 'rez_esc'] = 5
+    return df
+
 def preprocess(df):
     df = create_asset_index(df)
     df = create_housing_quality_features(df)
@@ -76,6 +103,10 @@ def preprocess(df):
     df = clean_education(df)
     df = per_capita_transformations(df)
     # df = map_booleans(df)
+    df = fit_outliers(df)
+
+    # Drop object columns that are not necessary for model
+    df.drop(['Id', 'idhogar', 'dependency', 'edjefe', 'edjefa'], axis=1, inplace=True)
 
     return df
 
