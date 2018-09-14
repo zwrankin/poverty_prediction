@@ -126,6 +126,19 @@ def feature_engineer_housing_quality(df):
 
     return df
 
+
+def feature_engineer_relationships(df, idvar='idhogar'):
+    varlist = ['estadocivil1', 'estadocivil2', 'estadocivil3', 'estadocivil4', 'estadocivil5', 'estadocivil6',
+               'estadocivil7', 'parentesco2', 'parentesco3', 'parentesco4', 'parentesco5', 'parentesco6',
+               'parentesco7', 'parentesco8', 'parentesco9', 'parentesco10', 'parentesco11', 'parentesco12',]
+    varlist2 = [f'{var}_mean' for var in varlist]
+
+    df2 = df.groupby(idvar)[varlist].mean()
+    df2.columns = varlist2
+
+    return pd.merge(df, df2.reset_index(), on='idhogar')
+
+
 def feature_engineer_house_characteristics(df):
     df['dependency_count'] = df['hogar_nin'] + df['hogar_mayor']
     # Original 'dependency' variable has 'yes' and 'no', so better to calculate it per definition
@@ -194,6 +207,12 @@ def preprocess(df):
 
     # Drop object columns that are not necessary for model
     df.drop(['Id', 'idhogar', 'dependency', 'edjefe', 'edjefa'], axis=1, inplace=True)
+
+    # # Remove useless feature to reduce dimension
+    # train.drop(columns=['idhogar', 'Id', 'tamhog', 'agesq', 'hogar_adul', 'SQBescolari', 'SQBage', 'SQBhogar_total',
+    #                     'SQBedjefe', 'SQBhogar_nin', 'SQBovercrowding', 'SQBdependency', 'SQBmeaned'], inplace=True)
+    # test.drop(columns=['idhogar', 'Id', 'tamhog', 'agesq', 'hogar_adul', 'SQBescolari', 'SQBage', 'SQBhogar_total',
+    #                    'SQBedjefe', 'SQBhogar_nin', 'SQBovercrowding', 'SQBdependency', 'SQBmeaned'], inplace=True)
 
     return df
 
