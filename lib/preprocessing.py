@@ -38,7 +38,61 @@ def fix_outliers(df):
     return df
 
 
-def feature_engineer_rent(df):
+def aggregate_features(df, varlist, functions, idvar='idhogar'):
+    """
+    Function to aggregate variables of interest as new variables in existing dataframe
+    :param df: pd.DataFrame
+    :param varlist: str or list of variables to aggregate
+    :param functions: str or list of agg functions to apply on varlist
+    :param idvar: household identifier
+    :return: pd.DataFrame df with additional columns merged on
+    """
+
+    if isinstance(varlist, str):
+        varlist = [varlist]
+
+    if isinstance(functions, str):
+        functions = [functions]
+
+    for f in functions:
+        varlist2 = [f'{var}_{f}' for var in varlist]
+        df2 = df.groupby(idvar)[varlist].agg(f)
+        df2.columns = varlist2
+        df = pd.merge(df, df2.reset_index(), on='idhogar')
+
+    return df
+
+
+def select_varlist(level: str, vars_level1: list, vars_level2: list, vars_level3: list):
+    """
+    Convenience function to return the appropriate cumulative varlist for a specified level of detail
+    :param level: str, one of ['low', 'medium', 'high']
+    :param vars_level1: base varlist
+    :param vars_level2: varlist to be added if level == 'medium'
+    :param vars_level3: varlist to be added if level == 'high'
+    """
+
+    if level not in ['low', 'medium', 'high']:
+        raise AssertionError(f'{level} not an acceptable level')
+
+    varlist = vars_level1
+
+    if level == 'medium':
+        varlist += vars_level2
+    elif level == 'high':
+        varlist += vars_level3
+
+    return varlist
+
+
+def feature_engineer_rent(df, level='low'):
+
+    varlist = select_varlist(level,
+                             vars_level1=['v2a1'],
+                             vars_level2=['rent_by_dep', 'rent_by_dep_count'],
+                             vars_level3=['rent_by_hhsize', 'rent_by_people', 'rent_by_rooms', 'rent_per_bedroom',
+                                          'rent_by_living', 'rent_by_minor', 'rent_by_adult', 'rent_by_dep',
+                                          'rent_by_dep_count'])
 
     # Fill in households that fully own house with 0 rent payment
     df.loc[(df['tipovivi1'] == 1), 'v2a1'] = 0  # tipovivi1, =1 own and fully paid house
@@ -63,10 +117,18 @@ def feature_engineer_rent(df):
     for col in ['rent_by_minor', 'rent_by_adult', 'rent_by_dep', 'rent_by_dep_count']:
         df.loc[df[col] > 1000000, col] = 1000000
 
-    return df
+    return df[varlist]
 
 
-def feature_engineer_education(df):
+def feature_engineer_education(df, level='low'):
+
+    varlist = select_varlist(level,
+                             vars_level1=['meaneduc', 'escolari', 'rez_esc', 'rez_esc_scaled'],
+                             vars_level2=['no_primary_education', 'rez_esc_escolari',
+                                          'meaneduc_mean', 'rez_esc_mean', 'rez_esc_scaled_mean'],
+                             vars_level3=['meaneduc_sum', 'rez_esc_sum', 'rez_esc_scaled_sum'])
+
+
     # A few individuals (incl heads of hh) have missing meaneduc but nonmissing escolari
     df.loc[df['meaneduc'].isnull(), 'meaneduc'] = df['escolari']
 
@@ -80,28 +142,23 @@ def feature_engineer_education(df):
     df['rez_esc_escolari'] = df['rez_esc'] / df['escolari']
     df.loc[df['escolari'] == 0, 'rez_esc_escolari'] = 5  # top code (for when escolari = 0)
 
-    # Aggregate some hh-level characteristics
     df['age_7_17'] = np.where((df['age'] >= 7) & (df['age'] <= 17), 1, 0)
-    df['hh_max_rez_esc'] = df.groupby('idhogar')['rez_esc'].transform(lambda x: x.max())
-    df['hh_sum_rez_esc'] = df.groupby('idhogar')['rez_esc'].transform(lambda x: x.sum())
 
-    df['hh_max_rez_esc_scaled'] = df.groupby('idhogar')['rez_esc_scaled'].transform(lambda x: x.max())
-    df['hh_sum_rez_esc_scaled'] = df.groupby('idhogar')['rez_esc_scaled'].transform(lambda x: x.sum())
-    df['hh_children_7_17'] = df.groupby('idhogar')['age_7_17'].transform(lambda x: x.sum())
+    agg_varlist = ['meaneduc', 'rez_esc', 'rez_esc_scaled', 'age_7_17']
+    df = aggregate_features(df, agg_varlist, ['mean', 'sum', 'max'])
 
-    df['hh_rez_esc_pp'] = df['hh_sum_rez_esc'] / df['hh_children_7_17']
+    df['hh_rez_esc_pp'] = df['rez_esc_sum'] / df['age_7_17_sum']
 
-    # drop intermediate vars
-    df.drop(['hh_children_7_17', 'age_7_17'], axis=1, inplace=True)
-
-    # For future: try as per https://www.kaggle.com/gaxxxx/exploratory-data-analysis-lightgbm
-    # cols = ['edjefe', 'edjefa']
-    # df[cols] = df[cols].replace({'no': 0, 'yes': 1}).astype(float)
-
-    return df
+    return df[varlist]
 
 
-def feature_engineer_age_composition(df):
+def feature_engineer_age_composition(df, level='low'):
+    varlist = select_varlist(level,
+                             vars_level1=['adult'],
+                             vars_level2=['adult_minus_child', 'child_percent', 'elder_percent', 'adult_percent'],
+                             vars_level3=['r4h1_percent_in_male', 'r4m1_percent_in_female', 'r4h1_percent_in_total',
+                                          'r4m1_percent_in_total', 'r4t1_percent_in_total', 'age_12_19', 'escolari_age'])
+
     # Especially training on heads of hh, important to ID houses with a minor as head of household
     df['adult'] = np.where(df['age'] > 18, 1, 0)
 
@@ -119,19 +176,34 @@ def feature_engineer_age_composition(df):
     df['age_12_19'] = df['hogar_nin'] - df['r4t1']
     df['escolari_age'] = df['escolari'] / df['age']
 
-    return df
+    return df[varlist]
 
 
-def feature_engineer_housing_quality(df):
+def feature_engineer_housing_quality(df, level='low'):
+    varlist = select_varlist(level,
+                             vars_level1=['wall_quality', 'roof_quality', 'floor_quality',
+                                          'house_material_vulnerability'],
+                             vars_level2=['epared1', 'etecho1', 'eviv1'],
+                             vars_level3=[])
+
     df['wall_quality'] = 0 * df['epared1'] + 1 * df['epared2'] + 2 * df['epared3']
     df['roof_quality'] = 0 * df['etecho1'] + 1 * df['etecho2'] + 2 * df['etecho3']
     df['floor_quality'] = 0 * df['eviv1'] + 1 * df['eviv2'] + 2 * df['eviv3']
     df['house_material_vulnerability'] = df['epared1'] + df['etecho1'] + df['eviv1']
 
-    return df
+    return df[varlist]
 
 
-def feature_engineer_house_characteristics(df):
+def feature_engineer_house_characteristics(df, level='low'):
+    varlist = select_varlist(level,
+                             vars_level1=['dependency_count', 'calc_dependency'],
+                             vars_level2=['calc_dependency_bin', 'overcrowding_room_and_bedroom', 'rooms_pc'],
+                             vars_level3=['bedroom_per_room', 'elder_per_room', 'adults_per_room',
+                                          'child_per_room', 'male_per_room', 'female_per_room',
+                                          'room_per_person_household', 'elder_per_bedroom', 'adults_per_bedroom',
+                                          'child_per_bedroom', 'male_per_bedroom', 'female_per_bedroom',
+                                          'bedrooms_per_person_household'])
+
     df['dependency_count'] = df['hogar_nin'] + df['hogar_mayor']
     # Original 'dependency' variable has 'yes' and 'no', so better to calculate it per definition
     df['calc_dependency'] = df['dependency_count'] / df['hogar_adul']
@@ -141,6 +213,7 @@ def feature_engineer_house_characteristics(df):
 
     df['overcrowding_room_and_bedroom'] = (df['hacdor'] + df['hacapo']) / 2
     df['rooms_pc'] = df['rooms'] / df['tamviv']
+
     df['bedroom_per_room'] = df['bedrooms'] / df['rooms']
     df['elder_per_room'] = df['hogar_mayor'] / df['rooms']
     df['adults_per_room'] = df['adult'] / df['rooms']
@@ -155,10 +228,15 @@ def feature_engineer_house_characteristics(df):
     df['female_per_bedroom'] = df['r4m3'] / df['bedrooms']
     df['bedrooms_per_person_household'] = df['hhsize'] / df['bedrooms']
 
-    return df
+    return df[varlist]
 
 
-def feature_engineer_assets(df):
+def feature_engineer_assets(df, level='low'):
+    varlist = select_varlist(level,
+                             vars_level1=['v18q', 'v18q1', 'asset_index1', 'house_utility_vulnerability'],
+                             vars_level2=['tablet_per_person_household', 'phone_per_person_household', 'asset_index2'],
+                             vars_level3=[])
+
     df.loc[df['v18q'] == 0, 'v18q1'] = 0  # num tablets = 0 if has_tablet == 0
     df['tablet_per_person_household'] = df['v18q1'] / df['hhsize']
     df['phone_per_person_household'] = df['qmobilephone'] / df['hhsize']
@@ -176,42 +254,58 @@ def feature_engineer_assets(df):
                                        df['noelec'] +
                                        df['sanitario1'])
 
+    return df[varlist]
+
+#
+# def feature_engineer_household_aggregates(df, idvar='idhogar'):
+#
+#     varlist_mean = ['rez_esc', 'dis', 'male', 'female', 'estadocivil1', 'estadocivil2', 'estadocivil3',
+#                       'estadocivil4', 'estadocivil5', 'estadocivil6', 'estadocivil7', 'parentesco2',
+#                       'parentesco3', 'parentesco4', 'parentesco5', 'parentesco6', 'parentesco7', 'parentesco8',
+#                       'parentesco9', 'parentesco10', 'parentesco11', 'parentesco12',
+#                       'instlevel1', 'instlevel2', 'instlevel3', 'instlevel4', 'instlevel5', 'instlevel6', 'instlevel7',
+#                       'instlevel8', 'instlevel9', ]
+#     varlist_mean2 = [f'{var}_mean' for var in varlist_mean]
+#
+#     df2 = df.groupby(idvar)[varlist_mean].mean()
+#     df2.columns = varlist_mean2
+#
+#     varlist_all = ['escolari', 'age', 'escolari_age']
+#
+#     for function in ['mean', 'std', 'min', 'max', 'sum']:
+#         hh_agg = df.groupby(idvar)[varlist_all].agg(function)
+#         varlist_all2 = [f'{var}_{function}' for var in varlist_all]
+#         hh_agg.columns = varlist_all2
+#         df2 = df2.merge(hh_agg, left_index=True, right_index=True)
+#
+#     return pd.merge(df, df2.reset_index(), on='idhogar')
+
+
+def basic_feature_engineering(df):
+    """Create important features that are used by other feature engineering transformers"""
+    df['dependency_count'] = df['hogar_nin'] + df['hogar_mayor']
+    # Original 'dependency' variable has 'yes' and 'no', so better to calculate it per definition
+    df['calc_dependency'] = df['dependency_count'] / df['hogar_adul']
+    df.loc[
+        df['hogar_adul'] == 0, 'calc_dependency'] = 8  # this is hacky, but original dependency var is 8 when no adults
+    df['calc_dependency_bin'] = np.where(df['calc_dependency'] == 0, 0, 1)
     return df
 
 
-def feature_engineer_household_aggregates(df, idvar='idhogar'):
-
-    varlist_mean = ['rez_esc', 'dis', 'male', 'female', 'estadocivil1', 'estadocivil2', 'estadocivil3',
-                      'estadocivil4', 'estadocivil5', 'estadocivil6', 'estadocivil7', 'parentesco2',
-                      'parentesco3', 'parentesco4', 'parentesco5', 'parentesco6', 'parentesco7', 'parentesco8',
-                      'parentesco9', 'parentesco10', 'parentesco11', 'parentesco12',
-                      'instlevel1', 'instlevel2', 'instlevel3', 'instlevel4', 'instlevel5', 'instlevel6', 'instlevel7',
-                      'instlevel8', 'instlevel9', ]
-    varlist_mean2 = [f'{var}_mean' for var in varlist_mean]
-
-    df2 = df.groupby(idvar)[varlist_mean].mean()
-    df2.columns = varlist_mean2
-
-    varlist_all = ['escolari', 'age', 'escolari_age']
-
-    for function in ['mean', 'std', 'min', 'max', 'sum']:
-        hh_agg = df.groupby(idvar)[varlist_all].agg(function)
-        varlist_all2 = [f'{var}_{function}' for var in varlist_all]
-        hh_agg.columns = varlist_all2
-        df2 = df2.merge(hh_agg, left_index=True, right_index=True)
-
-    return pd.merge(df, df2.reset_index(), on='idhogar')
-
-
-def run_feature_engineering(df):
-    df = feature_engineer_education(df)
-    df = feature_engineer_age_composition(df)
-    df = feature_engineer_housing_quality(df)
-    df = feature_engineer_house_characteristics(df)
-    df = feature_engineer_rent(df)
-    df = feature_engineer_assets(df)
-
-    df = feature_engineer_household_aggregates(df)
+def run_feature_engineering(df, level='low'):
+    """
+    Convenience function for running all feature engineering outside of pipeline
+    :param df: pd.DataFrame
+    :param level: level of feature engineering to be applied to ALL functions
+    :return: pd.DataFrame with only specified features
+    """
+    df = pd.concat([feature_engineer_rent(df, level),
+                    feature_engineer_education(df, level),
+                    feature_engineer_age_composition(df, level),
+                    feature_engineer_housing_quality(df, level),
+                    feature_engineer_house_characteristics(df, level),
+                    feature_engineer_assets(df, level)],
+                   axis=1)
 
     return df
 
@@ -221,10 +315,12 @@ def preprocess(df):
     df = clean_dummy_features(df)
     df = fix_outliers(df)
 
-    df = run_feature_engineering(df)
+    df = basic_feature_engineering(df)
+    # df = run_feature_engineering(df)
+
 
     # Drop object columns that are not necessary for model
-    df.drop(['Id', 'idhogar', 'dependency', 'edjefe', 'edjefa'], axis=1, inplace=True)
+    # df.drop(['Id', 'idhogar', 'dependency', 'edjefe', 'edjefa'], axis=1, inplace=True)
 
     # # Remove useless feature to reduce dimension
     # train.drop(columns=['idhogar', 'Id', 'tamhog', 'agesq', 'hogar_adul', 'SQBescolari', 'SQBage', 'SQBhogar_total',

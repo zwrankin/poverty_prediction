@@ -6,7 +6,8 @@ from sklearn.preprocessing import Imputer
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedKFold
 
-from.preprocessing import preprocess
+from .preprocessing import preprocess
+from .preprocessing import feature_engineer_rent, feature_engineer_education
 
 # Custom scorer for cross validation
 f1_scorer = make_scorer(f1_score, greater_is_better=True, average='macro')
@@ -44,6 +45,26 @@ class FeatureExtractor(BaseEstimator, TransformerMixin):
 
     def transform(self, data):
         return data[self.cols]
+
+
+class FeatureEngineer(BaseEstimator, TransformerMixin):
+    """
+    Custom sklearn transformer for using a feature engineering function, with control over
+    """
+    def __init__(self, func, level='low'):
+        """
+        :param func: a function that returns a pd.DataFrame with features of interest
+        :param level: str, one of ['low', 'medium', 'high'] passed to function
+        """
+        self.func = func
+        self.level = level
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, data):
+        return self.func(data, self.level)
+
 
 
 # Here are some hard-coded things use across notebooks
