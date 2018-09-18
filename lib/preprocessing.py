@@ -10,11 +10,13 @@ def fill_roof_exception(x):
     else:
         return 0
 
+
 def fill_no_electricity(x):
     if (x['public'] == 0) and (x['planpri'] == 0) and (x['noelec'] == 0) and (x['coopele'] == 0):
         return 1
     else:
         return 0
+
 
 def clean_dummy_features(df):
     df['roof_waste_material'] = df.apply(lambda x: fill_roof_exception(x), axis=1)
@@ -57,9 +59,10 @@ def feature_engineer_rent(df):
     # df['rent_by_num_gadgets'] = df['v2a1'] / (df['v18q1'] + df['qmobilephone'])
     # df['rent_by_appliances'] = df['v2a1'] / df['appliances']
 
-    #Top code at #1 million per whatever (mostly to avoid inf
-    for col in ['rent_by_minor', 'rent_by_adult', 'rent_by_dep']:
+    # Top code at #1 million per whatever (mostly to avoid inf)
+    for col in ['rent_by_minor', 'rent_by_adult', 'rent_by_dep', 'rent_by_dep_count']:
         df.loc[df[col] > 1000000, col] = 1000000
+
     return df
 
 
@@ -75,6 +78,7 @@ def feature_engineer_education(df):
     # Different ways of scaling years behind in school to school years
     df['rez_esc_scaled'] = df['rez_esc'] / (df['age'] - 6)  # years behind per year (ages 7-17)
     df['rez_esc_escolari'] = df['rez_esc'] / df['escolari']
+    df.loc[df['escolari'] == 0, 'rez_esc_escolari'] = 5  # top code (for when escolari = 0)
 
     # Aggregate some hh-level characteristics
     df['age_7_17'] = np.where((df['age'] >= 7) & (df['age'] <= 17), 1, 0)
@@ -127,18 +131,6 @@ def feature_engineer_housing_quality(df):
     return df
 
 
-def feature_engineer_relationships(df, idvar='idhogar'):
-    varlist = ['estadocivil1', 'estadocivil2', 'estadocivil3', 'estadocivil4', 'estadocivil5', 'estadocivil6',
-               'estadocivil7', 'parentesco2', 'parentesco3', 'parentesco4', 'parentesco5', 'parentesco6',
-               'parentesco7', 'parentesco8', 'parentesco9', 'parentesco10', 'parentesco11', 'parentesco12',]
-    varlist2 = [f'{var}_mean' for var in varlist]
-
-    df2 = df.groupby(idvar)[varlist].mean()
-    df2.columns = varlist2
-
-    return pd.merge(df, df2.reset_index(), on='idhogar')
-
-
 def feature_engineer_house_characteristics(df):
     df['dependency_count'] = df['hogar_nin'] + df['hogar_mayor']
     # Original 'dependency' variable has 'yes' and 'no', so better to calculate it per definition
@@ -187,6 +179,30 @@ def feature_engineer_assets(df):
     return df
 
 
+def feature_engineer_household_aggregates(df, idvar='idhogar'):
+
+    varlist_mean = ['rez_esc', 'dis', 'male', 'female', 'estadocivil1', 'estadocivil2', 'estadocivil3',
+                      'estadocivil4', 'estadocivil5', 'estadocivil6', 'estadocivil7', 'parentesco2',
+                      'parentesco3', 'parentesco4', 'parentesco5', 'parentesco6', 'parentesco7', 'parentesco8',
+                      'parentesco9', 'parentesco10', 'parentesco11', 'parentesco12',
+                      'instlevel1', 'instlevel2', 'instlevel3', 'instlevel4', 'instlevel5', 'instlevel6', 'instlevel7',
+                      'instlevel8', 'instlevel9', ]
+    varlist_mean2 = [f'{var}_mean' for var in varlist_mean]
+
+    df2 = df.groupby(idvar)[varlist_mean].mean()
+    df2.columns = varlist_mean2
+
+    varlist_all = ['escolari', 'age', 'escolari_age']
+
+    for function in ['mean', 'std', 'min', 'max', 'sum']:
+        hh_agg = df.groupby(idvar)[varlist_all].agg(function)
+        varlist_all2 = [f'{var}_{function}' for var in varlist_all]
+        hh_agg.columns = varlist_all2
+        df2 = df2.merge(hh_agg, left_index=True, right_index=True)
+
+    return pd.merge(df, df2.reset_index(), on='idhogar')
+
+
 def run_feature_engineering(df):
     df = feature_engineer_education(df)
     df = feature_engineer_age_composition(df)
@@ -194,6 +210,8 @@ def run_feature_engineering(df):
     df = feature_engineer_house_characteristics(df)
     df = feature_engineer_rent(df)
     df = feature_engineer_assets(df)
+
+    df = feature_engineer_household_aggregates(df)
 
     return df
 
