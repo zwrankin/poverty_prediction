@@ -23,16 +23,17 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
     """
     Custom sklearn transformer for using a feature engineering function, with control over
     """
-    def __init__(self, func, level='low'):
+    def __init__(self, func, level='low', drop_correlated_features=False):
         """
         :param func: a function that returns a pd.DataFrame with features of interest
         :param level: str, one of ['low', 'medium', 'high'] passed to function
         """
         self.func = func
         self.level = level
+        self.drop_correlated_features = drop_correlated_features
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, data):
-        return self.func(data, self.level)
+        return self.func(data, self.level, self.drop_correlated_features)

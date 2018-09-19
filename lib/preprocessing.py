@@ -38,6 +38,23 @@ def fix_outliers(df):
     return df
 
 
+def name_correlated_feature_to_drop(df, threshold=0.90):
+    """
+    Returns a list of HALF the correlated features
+    :param df: pd.DataFrame
+    :param threshold: threshold at which one correlated feature will be returned
+    :return: list of variables
+    """
+    corr_matrix = df.corr()
+    # Select upper triangle of correlation matrix
+    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
+
+    # Find index of feature columns with correlation >= threshold
+    to_drop = [column for column in upper.columns if any(abs(upper[column]) >= threshold)]
+
+    return to_drop
+
+
 def aggregate_features(df, varlist, functions, idvar='idhogar'):
     """
     Function to aggregate variables of interest as new variables in existing dataframe
@@ -86,7 +103,7 @@ def select_varlist(level: str, vars_level1: list, vars_level2: list, vars_level3
     return varlist
 
 
-def feature_engineer_rent(df, level='low'):
+def feature_engineer_rent(df, level='low', drop_correlated_features=False):
 
     varlist = select_varlist(level,
                              vars_level1=['v2a1', 'tipovivi_rank', 'rent_by_dep', 'tipovivi4', 'tipovivi2'],
@@ -122,10 +139,15 @@ def feature_engineer_rent(df, level='low'):
     for col in ['rent_by_minor', 'rent_by_adult', 'rent_by_dep', 'rent_by_dep_count']:
         df.loc[df[col] > 1000000, col] = 1000000
 
+    if drop_correlated_features:
+        # to_drop = name_correlated_feature_to_drop(df)
+        to_drop = ['tipovivi4']
+        varlist = [v for v in varlist if v not in to_drop]
+
     return df[varlist]
 
 
-def feature_engineer_education(df, level='low'):
+def feature_engineer_education(df, level='low', drop_correlated_features=False):
 
     varlist = select_varlist(level,
                              vars_level1=['meaneduc', 'escolari', 'educ_rank',
@@ -165,10 +187,15 @@ def feature_engineer_education(df, level='low'):
 
     df['hh_rez_esc_pp'] = df['rez_esc_sum'] / df['age_7_17_sum']
 
+    if drop_correlated_features:
+        # to_drop = name_correlated_feature_to_drop(df)
+        to_drop = ['escolari', 'educ_rank', 'rez_esc_sum', 'no_primary_education', 'higher_education']
+        varlist = [v for v in varlist if v not in to_drop]
+
     return df[varlist]
 
 
-def feature_engineer_demographics(df, level='low'):
+def feature_engineer_demographics(df, level='low', drop_correlated_features=False):
     varlist = select_varlist(level,
                              vars_level1=['adult', 'adult_percent', 'child_percent', 'r4t1_percent_in_total',
                                           'tamviv', 'hhsize', 'estadocivil3', 'estadocivil1', 'hogar_nin', 'hogar_adul',
@@ -202,10 +229,15 @@ def feature_engineer_demographics(df, level='low'):
     agg_varlist = ['dis', 'adult', 'male', 'female']
     df = aggregate_features(df, agg_varlist, ['mean', 'sum'])
 
+    if drop_correlated_features:
+        # to_drop = name_correlated_feature_to_drop(df)
+        to_drop = ['child_percent', 'r4t1_percent_in_total', 'hhsize', 'hogar_nin', 'age']
+        varlist = [v for v in varlist if v not in to_drop]
+
     return df[varlist]
 
 
-def feature_engineer_house_characteristics(df, level='low'):
+def feature_engineer_house_characteristics(df, level='low', drop_correlated_features=False):
     varlist = select_varlist(level,
                              vars_level1=['dependency_count', 'calc_dependency',
                                           'child_per_bedroom', 'female_per_bedroom', 'male_per_bedroom',
@@ -241,10 +273,15 @@ def feature_engineer_house_characteristics(df, level='low'):
     df['female_per_bedroom'] = df['r4m3'] / df['bedrooms']
     df['bedrooms_per_person_household'] = df['hhsize'] / df['bedrooms']
 
+    if drop_correlated_features:
+        # to_drop = name_correlated_feature_to_drop(df)
+        to_drop = ['calc_dependency', 'rooms', 'bedrooms_per_person_household']
+        varlist = [v for v in varlist if v not in to_drop]
+
     return df[varlist]
 
 
-def feature_engineer_house_rankings(df, level='low'):
+def feature_engineer_house_rankings(df, level='low', drop_correlated_features=False):
     # Note - I'm making the arbitrary decision that any individual aspect with >10% correlation and n > 100 is medium
     # and any with >20% and n > 100 is level1
     # Note - noelec is level2 because n = 21
@@ -315,10 +352,15 @@ def feature_engineer_house_rankings(df, level='low'):
     df['utility_rank_sum'] = np.NaN
     df['utility_rank_sum'] = df['water_rank'] + df['electricity_rank'] + df['toilet_rank'] + df['cooking_rank'] + df['trash_rank']
 
+    if drop_correlated_features:
+        # to_drop = name_correlated_feature_to_drop(df)
+        to_drop = ['roof_quality', 'floor_quality', 'house_material_bad', 'house_material_good', 'material_rank_sum', 'cielorazo', 'pisocemento', 'pisomoscer', 'paredblolad', 'epared1', 'epared3', 'etecho1', 'etecho3', 'eviv1', 'eviv3']
+        varlist = [v for v in varlist if v not in to_drop]
+
     return df[varlist]
 
 
-def feature_engineer_assets(df, level='low'):
+def feature_engineer_assets(df, level='low', drop_correlated_features=False):
     varlist = select_varlist(level,
                              vars_level1=['v18q', 'asset_index', 'house_utility_vulnerability',
                                           'phone_per_person_household', ''
@@ -338,13 +380,18 @@ def feature_engineer_assets(df, level='low'):
     df['asset_index'] = np.NaN
     df['asset_index'] = df['refrig'] + df['computer'] + df['television'] + df['mobilephone'] + df['v18q']
 
-    df['asset_index'] = np.NaN
+    df['house_utility_vulnerability'] = np.NaN
     df['house_utility_vulnerability'] = (df['sanitario1'] +
                                        df['pisonotiene'] +
                                        (df['cielorazo'] == 0) +  # coding is opposite (the house has ceiling)
                                        df['abastaguano'] +
                                        df['noelec'] +
                                        df['sanitario1'])
+
+    if drop_correlated_features:
+        # to_drop = name_correlated_feature_to_drop(df)
+        to_drop = ['sanitario1']
+        varlist = [v for v in varlist if v not in to_drop]
 
     return df[varlist]
 
