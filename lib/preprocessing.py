@@ -154,8 +154,8 @@ def feature_engineer_education(df, level='low'):
 
 def feature_engineer_age_composition(df, level='low'):
     varlist = select_varlist(level,
-                             vars_level1=['adult'],
-                             vars_level2=['adult_minus_child', 'child_percent', 'elder_percent', 'adult_percent'],
+                             vars_level1=['adult', ],
+                             vars_level2=['dis', 'male', 'female', 'adult_minus_child', 'child_percent', 'elder_percent', 'adult_percent'],
                              vars_level3=['r4h1_percent_in_male', 'r4m1_percent_in_female', 'r4h1_percent_in_total',
                                           'r4m1_percent_in_total', 'r4t1_percent_in_total', 'age_12_19', 'escolari_age'])
 
@@ -179,26 +179,11 @@ def feature_engineer_age_composition(df, level='low'):
     return df[varlist]
 
 
-def feature_engineer_housing_quality(df, level='low'):
-    varlist = select_varlist(level,
-                             vars_level1=['wall_quality', 'roof_quality', 'floor_quality',
-                                          'house_material_vulnerability'],
-                             vars_level2=['epared1', 'etecho1', 'eviv1'],
-                             vars_level3=[])
-
-    df['wall_quality'] = 0 * df['epared1'] + 1 * df['epared2'] + 2 * df['epared3']
-    df['roof_quality'] = 0 * df['etecho1'] + 1 * df['etecho2'] + 2 * df['etecho3']
-    df['floor_quality'] = 0 * df['eviv1'] + 1 * df['eviv2'] + 2 * df['eviv3']
-    df['house_material_vulnerability'] = df['epared1'] + df['etecho1'] + df['eviv1']
-
-    return df[varlist]
-
-
 def feature_engineer_house_characteristics(df, level='low'):
     varlist = select_varlist(level,
-                             vars_level1=['dependency_count', 'calc_dependency'],
-                             vars_level2=['calc_dependency_bin', 'overcrowding_room_and_bedroom', 'rooms_pc'],
-                             vars_level3=['bedroom_per_room', 'elder_per_room', 'adults_per_room',
+                             vars_level1=['dependency_count', 'calc_dependency', 'rooms'],
+                             vars_level2=['hacdor', 'hacapo', 'calc_dependency_bin', 'rooms_pc'],
+                             vars_level3=['overcrowding_room_and_bedroom', 'bedroom_per_room', 'elder_per_room', 'adults_per_room',
                                           'child_per_room', 'male_per_room', 'female_per_room',
                                           'room_per_person_household', 'elder_per_bedroom', 'adults_per_bedroom',
                                           'child_per_bedroom', 'male_per_bedroom', 'female_per_bedroom',
@@ -231,9 +216,85 @@ def feature_engineer_house_characteristics(df, level='low'):
     return df[varlist]
 
 
+def feature_engineer_house_rankings(df, level='low'):
+    # Note - I'm making the arbitrary decision that any individual aspect with >10% correlation and n > 100 is medium
+    # and any with >20% and n > 100 is level1
+    # Note - noelec is level2 because n = 21
+    varlist = select_varlist(level,
+                             vars_level1=['floor_rank', 'wall_rank', 'roof_rank', 'water_rank', 'electricity_rank',
+                                          'toilet_rank', 'cooking_rank', 'trash_rank',
+                                          'wall_quality', 'roof_quality', 'floor_quality',
+                                          'house_material_bad', 'house_material_good',
+                                          'material_rank_sum', 'utility_rank_sum',
+                                          'cielorazo', 'energcocinar4', 'pisocemento', 'pisomoscer', 'paredblolad',
+                                          'epared1', 'epared3', 'etecho1', 'etecho3', 'eviv1', 'eviv3'],
+                             vars_level2=['pisonotiene', 'paredmad', 'abastaguadentro',
+                                          'noelec', 'energcocinar2', 'energcocinar4',
+                                          'elimbasu3', 'elimbasu1', 'epared2', 'etecho2', 'eviv2'],
+                             vars_level3=['pisoother', 'pisonatur', 'pisomadera', 'public', 'sanitario5',
+                                          'paredpreb', 'pareddes', 'paredzocalo', 'paredzinc', 'paredfibras', 'paredother',
+                                          'techocane', 'techoentrepiso', 'techozinc', 'techootro',
+                                          'abastaguafuera', 'abastaguano', 'coopele',
+                                          'sanitario1', 'sanitario2', 'sanitario3', 'sanitario6',
+                                          'energcocinar3', 'energcocinar1',
+                                          'elimbasu2', 'elimbasu4', 'elimbasu6',
+                                          ])
+
+    df['floor_rank'] = np.NaN
+    df['floor_rank'] = 0 * df ['pisonotiene'] + df['pisocemento'] + 2 * df['pisomadera'] + 3 * df['pisonatur'] + \
+                       4 * df['pisoother'] + 5 * df['pisomoscer']
+
+    df['wall_rank'] = np.NaN
+    df['wall_rank'] = 0 * df['paredmad'] + df['paredpreb'] + 2 * df['pareddes'] + 3 * df['paredzocalo'] + \
+                      4 * df['paredzinc'] + 5 * df['paredfibras'] + 6 * df['paredother'] + 7 * df['paredblolad']
+
+    df['roof_rank'] = np.NaN
+    df['roof_rank'] = 0 * df['techocane'] + df['techoentrepiso'] + 2 * df['techozinc'] + 3 * df['techootro']
+
+    df['water_rank'] = np.NaN
+    df['water_rank'] = 0 * df['abastaguano'] + df['abastaguafuera'] + 2 * df['abastaguadentro']
+
+    df['electricity_rank'] = np.NaN
+    df['electricity_rank'] = 0 * df['noelec'] + df['planpri'] + 2 * df['coopele'] + 3 * df['public']
+
+    # ranking off correlations even though they don't logically align (e.g., no toilet isn't the worst)
+    df['toilet_rank'] = np.NaN
+    df['toilet_rank'] = 0 * df['sanitario5'] + df['sanitario1'] + 2 * df['sanitario3'] + \
+                        3 * df['sanitario6'] + 4 * df['sanitario2']
+
+    df['cooking_rank'] = np.NaN
+    df['cooking_rank'] = 0 * df['energcocinar4'] + df['energcocinar3'] + 2 * df['energcocinar1'] + 3 * df['energcocinar2']
+
+    df['trash_rank'] = np.NaN
+    df['trash_rank'] = 0 * df['elimbasu3'] + df['elimbasu2'] + 2 * df['elimbasu4'] + 3 * df['elimbasu6'] + \
+                      4 * df['elimbasu1']
+
+    df['wall_quality'] = np.NaN
+    df['wall_quality'] = 0 * df['epared1'] + 1 * df['epared2'] + 2 * df['epared3']
+
+    df['roof_quality'] = np.NaN
+    df['roof_quality'] = 0 * df['etecho1'] + 1 * df['etecho2'] + 2 * df['etecho3']
+
+    df['floor_quality'] = np.NaN
+    df['floor_quality'] = 0 * df['eviv1'] + 1 * df['eviv2'] + 2 * df['eviv3']
+
+    df['house_material_bad'] = df['epared1'] + df['etecho1'] + df['eviv1']
+    df['house_material_good'] = df['epared3'] + df['etecho3'] + df['eviv3']
+
+    df['material_rank_sum'] = np.NaN
+    df['material_rank_sum'] = df['floor_rank'] + df['wall_rank'] + df['roof_rank']
+
+    df['utility_rank_sum'] = np.NaN
+    df['utility_rank_sum'] = df['water_rank'] + df['electricity_rank'] + df['toilet_rank'] + df['cooking_rank'] + df['trash_rank']
+
+    return df[varlist]
+
+
+
 def feature_engineer_assets(df, level='low'):
     varlist = select_varlist(level,
-                             vars_level1=['v18q', 'v18q1', 'asset_index1', 'house_utility_vulnerability'],
+                             vars_level1=['v18q', 'v18q1', 'asset_index1', 'house_utility_vulnerability',
+                                          'v14a', 'refrig' 'sanitario1', ''],
                              vars_level2=['tablet_per_person_household', 'phone_per_person_household', 'asset_index2'],
                              vars_level3=[])
 
@@ -302,7 +363,7 @@ def run_feature_engineering(df, level='low'):
     df = pd.concat([feature_engineer_rent(df, level),
                     feature_engineer_education(df, level),
                     feature_engineer_age_composition(df, level),
-                    feature_engineer_housing_quality(df, level),
+                    feature_engineer_house_rankings(df, level),
                     feature_engineer_house_characteristics(df, level),
                     feature_engineer_assets(df, level)],
                    axis=1)
