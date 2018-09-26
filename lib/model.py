@@ -26,6 +26,12 @@ feature_extraction = FeatureUnion(transformer_list=[
     ('extract_assets', FeatureEngineer(feature_engineer_assets))
 ])
 
+transformer_pipeline = Pipeline(steps=[
+                        ('features', feature_extraction),
+                        ('imputer', Imputer(strategy='mean')),
+                        ('feature_scaler', StandardScaler()),
+                        ])
+
 full_pipeline = Pipeline(steps=[
                         ('features', feature_extraction),
                         ('imputer', Imputer(strategy='mean')),
@@ -53,9 +59,8 @@ def load_and_process_training_data():
     """
     train = pd.read_csv('../input/train.csv')
 
-    # IMPORTANT: according to the competition (https://www.kaggle.com/c/costa-rican-household-poverty-prediction/discussion/61403),
-    # ONLY heads of household are used in scoring, so we should only train on them (with some household aggregate features)
-    X_train = preprocess(train).drop('Target', axis=1).query('parentesco1 == 1')
+    # Note that subsetting X_train to heads of households happens during feature engineering, but subset y_train here
+    X_train = preprocess(train).drop('Target', axis=1)
     y_train = train.query('parentesco1 == 1')['Target']
 
     return X_train, y_train

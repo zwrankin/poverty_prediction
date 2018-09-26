@@ -1,9 +1,11 @@
 import pandas as pd
 import numpy as np
 
+# IMPORTANT: according to the competition (https://www.kaggle.com/c/costa-rican-household-poverty-prediction/discussion/61403),
+# ONLY heads of household are used in scoring, so we should only train on them (with some household aggregate features)
+SUBSET_TO_HEAD_OF_HOUSEHOLD = True
 
 # Next three functions are from https://www.kaggle.com/gaxxxx/exploratory-data-analysis-lightgbm
-# TODO - check validity
 def fill_roof_exception(x):
     if (x['techozinc'] == 0) and (x['techoentrepiso'] == 0) and (x['techocane'] == 0) and (x['techootro'] == 0):
         return 1
@@ -144,6 +146,9 @@ def feature_engineer_rent(df, level='low', drop_correlated_features=False):
         to_drop = ['tipovivi4']
         varlist = [v for v in varlist if v not in to_drop]
 
+    if SUBSET_TO_HEAD_OF_HOUSEHOLD:
+        df = df.query('parentesco1 == 1')
+
     return df[varlist]
 
 
@@ -192,6 +197,9 @@ def feature_engineer_education(df, level='low', drop_correlated_features=False):
         to_drop = ['escolari', 'educ_rank', 'rez_esc_sum', 'no_primary_education', 'higher_education']
         varlist = [v for v in varlist if v not in to_drop]
 
+    if SUBSET_TO_HEAD_OF_HOUSEHOLD:
+        df = df.query('parentesco1 == 1')
+
     return df[varlist]
 
 
@@ -233,6 +241,9 @@ def feature_engineer_demographics(df, level='low', drop_correlated_features=Fals
         # to_drop = name_correlated_feature_to_drop(df)
         to_drop = ['child_percent', 'r4t1_percent_in_total', 'hhsize', 'hogar_nin', 'age']
         varlist = [v for v in varlist if v not in to_drop]
+
+    if SUBSET_TO_HEAD_OF_HOUSEHOLD:
+        df = df.query('parentesco1 == 1')
 
     return df[varlist]
 
@@ -277,6 +288,9 @@ def feature_engineer_house_characteristics(df, level='low', drop_correlated_feat
         # to_drop = name_correlated_feature_to_drop(df)
         to_drop = ['calc_dependency', 'rooms', 'bedrooms_per_person_household']
         varlist = [v for v in varlist if v not in to_drop]
+
+    if SUBSET_TO_HEAD_OF_HOUSEHOLD:
+        df = df.query('parentesco1 == 1')
 
     return df[varlist]
 
@@ -357,6 +371,9 @@ def feature_engineer_house_rankings(df, level='low', drop_correlated_features=Fa
         to_drop = ['roof_quality', 'floor_quality', 'house_material_bad', 'house_material_good', 'material_rank_sum', 'cielorazo', 'pisocemento', 'pisomoscer', 'paredblolad', 'epared1', 'epared3', 'etecho1', 'etecho3', 'eviv1', 'eviv3']
         varlist = [v for v in varlist if v not in to_drop]
 
+    if SUBSET_TO_HEAD_OF_HOUSEHOLD:
+        df = df.query('parentesco1 == 1')
+
     return df[varlist]
 
 
@@ -374,9 +391,6 @@ def feature_engineer_assets(df, level='low', drop_correlated_features=False):
     df['tablet_per_person_household'] = df['v18q1'] / df['hhsize']
     df['phone_per_person_household'] = df['qmobilephone'] / df['hhsize']
 
-    # df['phones_pc'] = df['qmobilephone'] / df['tamviv']
-    # df['tablets_pc'] = df['v18q1'] / df['tamviv']
-
     df['asset_index'] = np.NaN
     df['asset_index'] = df['refrig'] + df['computer'] + df['television'] + df['mobilephone'] + df['v18q']
 
@@ -392,6 +406,9 @@ def feature_engineer_assets(df, level='low', drop_correlated_features=False):
         # to_drop = name_correlated_feature_to_drop(df)
         to_drop = ['sanitario1']
         varlist = [v for v in varlist if v not in to_drop]
+
+    if SUBSET_TO_HEAD_OF_HOUSEHOLD:
+        df = df.query('parentesco1 == 1')
 
     return df[varlist]
 
@@ -426,10 +443,9 @@ def run_feature_engineering(df, level='low'):
 
 
 def preprocess(df):
-
+    """Convenience function for data processing before pipeline"""
     df = clean_dummy_features(df)
     df = fix_outliers(df)
-
     df = basic_feature_engineering(df)
 
     return df
