@@ -3,7 +3,7 @@ import numpy as np
 
 # IMPORTANT: according to the competition (https://www.kaggle.com/c/costa-rican-household-poverty-prediction/discussion/61403),
 # ONLY heads of household are used in scoring, so we should only train on them (with some household aggregate features)
-SUBSET_TO_HEAD_OF_HOUSEHOLD = True
+SUBSET_TO_HEAD_OF_HOUSEHOLD = False
 
 # Next three functions are from https://www.kaggle.com/gaxxxx/exploratory-data-analysis-lightgbm
 def fill_roof_exception(x):
@@ -155,15 +155,11 @@ def feature_engineer_rent(df, level='low', drop_correlated_features=False):
 def feature_engineer_education(df, level='low', drop_correlated_features=False):
 
     varlist = select_varlist(level,
-                             vars_level1=['meaneduc', 'escolari', 'educ_rank',
-                                          'rez_esc_scaled_sum', 'rez_esc_sum',
+                             vars_level1=['meaneduc', 'escolari', 'educ_rank', 'rez_esc',
                                           'no_primary_education', 'higher_education'],
                              vars_level2=['rez_esc_escolari',
-                                          'instlevel2', 'instlevel1', 'instlevel9', 'instlevel8',
-                                          'meaneduc_mean', 'rez_esc_mean', 'rez_esc_scaled_mean',
-                                          'rez_esc', 'rez_esc_scaled'],
-                             vars_level3=['meaneduc_sum', 'rez_esc_sum', 'rez_esc_scaled_sum',
-                                          'instlevel3', 'instlevel4', 'instlevel5', 'instlevel6', 'instlevel7'])
+                                          'instlevel2', 'instlevel1', 'instlevel9', 'instlevel8'],
+                             vars_level3=['instlevel3', 'instlevel4', 'instlevel5', 'instlevel6', 'instlevel7'])
 
 
     # A few individuals (incl heads of hh) have missing meaneduc but nonmissing escolari
@@ -187,14 +183,14 @@ def feature_engineer_education(df, level='low', drop_correlated_features=False):
 
     df['age_7_17'] = np.where((df['age'] >= 7) & (df['age'] <= 17), 1, 0)
 
-    agg_varlist = ['meaneduc', 'rez_esc', 'rez_esc_scaled', 'age_7_17']
-    df = aggregate_features(df, agg_varlist, ['mean', 'sum', 'max'])
+    # agg_varlist = ['meaneduc', 'rez_esc', 'rez_esc_scaled', 'age_7_17']
+    # df = aggregate_features(df, agg_varlist, ['mean', 'sum', 'max'])
 
-    df['hh_rez_esc_pp'] = df['rez_esc_sum'] / df['age_7_17_sum']
+    # df['hh_rez_esc_pp'] = df['rez_esc_sum'] / df['age_7_17_sum']
 
     if drop_correlated_features:
         # to_drop = name_correlated_feature_to_drop(df)
-        to_drop = ['escolari', 'educ_rank', 'rez_esc_sum', 'no_primary_education', 'higher_education']
+        to_drop = ['escolari', 'educ_rank', 'no_primary_education', 'higher_education']
         varlist = [v for v in varlist if v not in to_drop]
 
     if SUBSET_TO_HEAD_OF_HOUSEHOLD:
@@ -208,7 +204,7 @@ def feature_engineer_demographics(df, level='low', drop_correlated_features=Fals
                              vars_level1=['adult', 'adult_percent', 'child_percent', 'r4t1_percent_in_total',
                                           'tamviv', 'hhsize', 'estadocivil3', 'estadocivil1', 'hogar_nin', 'hogar_adul',
                                           'lugar1', 'area1', 'age'],
-                             vars_level2=['dis', 'male', 'female', 'adult_minus_child', 'elder_percent', 'adult_percent',
+                             vars_level2=['dis', 'male', 'female', 'adult_minus_child', 'elder_percent',
                                           'dis_sum', 'hogar_mayor', 'hogar_total',
                                           'lugar2', 'lugar3', 'lugar4', 'lugar5', 'lugar6'],
                              vars_level3=['r4h1_percent_in_male', 'r4m1_percent_in_female', 'r4h1_percent_in_total',
@@ -308,7 +304,7 @@ def feature_engineer_house_rankings(df, level='low', drop_correlated_features=Fa
                                           'cielorazo', 'energcocinar4', 'pisocemento', 'pisomoscer', 'paredblolad',
                                           'epared1', 'epared3', 'etecho1', 'etecho3', 'eviv1', 'eviv3'],
                              vars_level2=['pisonotiene', 'paredmad', 'abastaguadentro',
-                                          'noelec', 'energcocinar2', 'energcocinar4',
+                                          'noelec', 'energcocinar2',
                                           'elimbasu3', 'elimbasu1', 'epared2', 'etecho2', 'eviv2'],
                              vars_level3=['pisoother', 'pisonatur', 'pisomadera', 'public', 'sanitario5',
                                           'paredpreb', 'pareddes', 'paredzocalo', 'paredzinc', 'paredfibras', 'paredother',
@@ -382,7 +378,7 @@ def feature_engineer_assets(df, level='low', drop_correlated_features=False):
                              vars_level1=['v18q', 'asset_index', 'house_utility_vulnerability',
                                           'phone_per_person_household', ''
                                           'v14a', 'refrig', 'sanitario1',
-                                          'computer', 'television', ],
+                                          'computer', 'television', 'tech'],
                              vars_level2=['tablet_per_person_household', 'v18q1',
                                           'mobilephone', 'qmobilephone'],
                              vars_level3=[])
@@ -390,6 +386,9 @@ def feature_engineer_assets(df, level='low', drop_correlated_features=False):
     df.loc[df['v18q'] == 0, 'v18q1'] = 0  # num tablets = 0 if has_tablet == 0
     df['tablet_per_person_household'] = df['v18q1'] / df['hhsize']
     df['phone_per_person_household'] = df['qmobilephone'] / df['hhsize']
+
+    df['tech'] = np.NaN
+    df['tech'] = df['v18q'] + df['mobilephone']
 
     df['asset_index'] = np.NaN
     df['asset_index'] = df['refrig'] + df['computer'] + df['television'] + df['mobilephone'] + df['v18q']
@@ -413,6 +412,28 @@ def feature_engineer_assets(df, level='low', drop_correlated_features=False):
     return df[varlist]
 
 
+def feature_engineer_aggregate_individuals(df):
+    ind_bool = ['v18q', 'dis', 'male', 'female', 'estadocivil1', 'estadocivil2', 'estadocivil3',
+                'estadocivil4', 'estadocivil5', 'estadocivil6', 'estadocivil7',
+                'parentesco1', 'parentesco2', 'parentesco3', 'parentesco4', 'parentesco5',
+                'parentesco6', 'parentesco7', 'parentesco8', 'parentesco9', 'parentesco10',
+                'parentesco11', 'parentesco12', 'instlevel1', 'instlevel2', 'instlevel3',
+                'instlevel4', 'instlevel5', 'instlevel6', 'instlevel7', 'instlevel8',
+                'instlevel9', 'mobilephone', 'rez_esc-missing']
+
+    ind_ordered = ['rez_esc', 'escolari', 'age']
+    ind_engineered = ['educ_rank', 'rez_esc_scaled',
+                      'no_primary_education', 'higher_education']
+    ind_all = ind_bool + ind_ordered + ind_engineered
+
+    cols = [col for col in ind_all if col in df.columns]
+
+    functions = ['min', 'max', 'sum', 'count', 'std']
+    agg = aggregate_features(df, cols, functions, idvar='idhogar').drop('idhogar', axis=1)
+
+    return agg
+
+
 def basic_feature_engineering(df):
     """Create important features that are used by other feature engineering transformers"""
     df['dependency_count'] = df['hogar_nin'] + df['hogar_mayor']
@@ -424,13 +445,16 @@ def basic_feature_engineering(df):
     return df
 
 
-def run_feature_engineering(df, level='low'):
+def run_feature_engineering(df, level='low', drop_correlation_threshold=None):
     """
     Convenience function for running all feature engineering outside of pipeline
     :param df: pd.DataFrame
     :param level: level of feature engineering to be applied to ALL functions
+    :param drop_correlation_threshold: if not None, then the threshold above which one of each pair of correlated
+    featrues will be dropped
     :return: pd.DataFrame with only specified features
     """
+    hh_ids = df['idhogar']
     df = pd.concat([feature_engineer_rent(df, level),
                     feature_engineer_education(df, level),
                     feature_engineer_demographics(df, level),
@@ -438,6 +462,12 @@ def run_feature_engineering(df, level='low'):
                     feature_engineer_house_characteristics(df, level),
                     feature_engineer_assets(df, level)],
                    axis=1)
+    df['idhogar'] = hh_ids
+    df = feature_engineer_aggregate_individuals(df)
+
+    if drop_correlation_threshold:
+        to_drop = name_correlated_feature_to_drop(df, threshold=drop_correlation_threshold)
+        df.drop(to_drop, axis=1, inplace=True)
 
     return df
 
