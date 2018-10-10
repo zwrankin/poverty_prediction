@@ -6,6 +6,7 @@ Playing around with multiclass classification of Costa Rican household dataset (
 
 ## Important note: 
 My goal with this repository is **not to get the best Kaggle score**. I know, crazy, right? I'm more interested in learning best practices, such as building one pipeline for the entire model. Most if not all of the leading kernels (such as https://www.kaggle.com/willkoehrsen/a-complete-introduction-and-walkthrough) may do pipelines for a couple steps but not for the whole model. Indeed, I scored higher when I did all the transformers (including feature selection) once then scored cross validation on just the final estimator (rather than the entire pipeline).  
+In fact, I didn't submit my final model to Kaggle because it's a kernels-only competition and I was focused on building pipelines and such. 
 
 ## Outline + Lessons (see `/notebooks/10_01_model_development.ipynb`)
 - **Feature engineering:** 
