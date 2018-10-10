@@ -7,6 +7,7 @@ from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn.metrics import f1_score, make_scorer
 from sklearn.model_selection import StratifiedKFold
 from sklearn.feature_selection import SelectFromModel, RFECV
+from sklearn.model_selection import cross_val_score
 
 from .preprocessing import preprocess
 from .preprocessing import run_feature_engineering
@@ -99,6 +100,12 @@ def load_and_process_test_data(engineer_features=True):
     if engineer_features:
         X_test = run_feature_engineering(X_test, level='medium')
     return X_test
+
+
+def pipeline_cv_score(model_pipeline, X, y):
+    """Display cross-validation score of a pipeline given data X and y"""
+    cv_score = cross_val_score(model_pipeline, X, y, cv=kfold, scoring=f1_scorer, n_jobs=-1)
+    print(f'Cross Validation F1 Score = {round(cv_score.mean(), 4)} with std = {round(cv_score.std(), 4)}')
 
 
 if __name__ == 'main':
