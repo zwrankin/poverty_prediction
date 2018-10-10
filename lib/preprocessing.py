@@ -413,7 +413,7 @@ def feature_engineer_assets(df, level='low', drop_correlated_features=False):
 
 
 def feature_engineer_aggregate_individuals(df):
-    ind_bool = ['v18q', 'dis', 'male', 'female', 'estadocivil1', 'estadocivil2', 'estadocivil3',
+    ind_bool = ['v18q', 'adult', 'male', 'female', 'estadocivil1', 'estadocivil2', 'estadocivil3',
                 'estadocivil4', 'estadocivil5', 'estadocivil6', 'estadocivil7',
                 'parentesco1', 'parentesco2', 'parentesco3', 'parentesco4', 'parentesco5',
                 'parentesco6', 'parentesco7', 'parentesco8', 'parentesco9', 'parentesco10',
@@ -431,6 +431,11 @@ def feature_engineer_aggregate_individuals(df):
     functions = ['min', 'max', 'sum', 'count', 'std']
     agg = aggregate_features(df, cols, functions, idvar='idhogar').drop('idhogar', axis=1)
 
+    # if later we just want newly created vars
+    # keep_cols = []
+    # for c in cols:
+    #     for f in functions:
+    #         keep_cols += [c + '_' + f]
     return agg
 
 

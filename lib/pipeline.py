@@ -45,9 +45,13 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
 
 
 class BaggedLGBMClassifier(BaseEstimator, ClassifierMixin):
-    """ADD DOCSTRING"""
+    """
+    Custom sklearn classifier that uses bagging to fit gradient boosted model with early stopping
+    Early stopping uses the unsampled (aka "out-of-bag") observations as validation set
+    Different than sklearn's native BaggingClassifier because it allows early stopping
+    """
 
-    # TODO - these defaults are from old optimization, please update
+    # TODO - these defaults are from old optimization, not sure if it would be better to use LGBMClassifier defaults
     def __init__(self, n_meta_estimators=5, early_stopping_rounds=10, random_state=0,
                  boosting_type='dart', colsample_bytree=0.58, learning_rate=0.087, min_child_samples=15,
                  num_leaves=48, reg_alpha=0.42, reg_lambda=0.36, subsample_for_bin=40000, subsample=0.99,
@@ -71,16 +75,16 @@ class BaggedLGBMClassifier(BaseEstimator, ClassifierMixin):
 
     def bag_and_boost_model(self, X, y, random_state):
         """
-        Fits a gradient boosted model to bootstrapped data, and uses the unsampled (aka "out-of-bag") observations
+        Fits single gradient boosted model to bootstrapped data, using unsampled (aka "out-of-bag") observations
         as a validation set for early stopping
-        Different than sklearn's native BaggingClassifier because it allows early stopping
         """
 
-        # First implementation is cleaner with pd.DataFrame
-        if isinstance(X, np.ndarray):
-            X = pd.DataFrame(X)
-        if isinstance(y, np.ndarray):
-            X = pd.DataFrame(y)
+        # First implementation is cleaner with pd.DataFrame (as opposed to np.array)
+        # Howevever, during some cross-validation processes, I was finding some inconsistency between
+        # preservation of indices between X and y (e.g. because X became np.array in pipeline but y stayed pd.DataFrame)
+        X = pd.DataFrame(X).reset_index().drop('index', axis=1)
+        y = pd.DataFrame(y).reset_index().drop('index', axis=1)
+        assert (y.index == X.index, 'X and y indices do not match')
 
         # Note that due to bootstrapping, sample_fraction=1 still leaves ~37% of data in the validation set
         X_train, y_train = resample(X, y, n_samples=len(X), replace=True, random_state=random_state)
@@ -120,8 +124,10 @@ class BaggedLGBMClassifier(BaseEstimator, ClassifierMixin):
         clf3 = self.bag_and_boost_model(X, y, random_state=self.random_state + 3)
         clf4 = self.bag_and_boost_model(X, y, random_state=self.random_state + 4)
         clf5 = self.bag_and_boost_model(X, y, random_state=self.random_state + 5)
-
         self.clfs = [clf1, clf2, clf3, clf4, clf5]
+
+        self.feature_importances_ = np.mean([c.feature_importances_ for c in self.clfs], axis=0)
+        self.feature_importances_ /= self.feature_importances_.max()  # scale 0-1
 
         return self
 

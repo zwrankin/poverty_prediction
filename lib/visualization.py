@@ -146,6 +146,7 @@ def plot_feature_importances(df, n=20, threshold=None, return_df=False):
     plt.rcParams['font.size'] = 12
 
     # Bar plot of n most important features
+    plt.figure(figsize=(8, 0.5*n))
     df.loc[:n, :].plot.barh(y='importance_normalized',
                             x='feature', color='darkgreen',
                             edgecolor='k', figsize=(12, 8),
