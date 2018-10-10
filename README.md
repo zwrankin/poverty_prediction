@@ -32,8 +32,13 @@ My goal with this repository is **not to get the best Kaggle score**. I know, cr
 - Build ensembles with `brew` (https://pypi.org/project/brew/) or `mlens` (https://github.com/flennerhag/mlens)
  
  
- ## Running model: 
- Here is how to fit the tuned model outside of the notebook
+ ## Loading final model: 
+ *You can load the pickled model*
+ ```
+ from sklearn.externals import joblib
+model = joblib.load('models/model.pkl')
+```
+ *Or load the pipeline, data, and hyperparameters*.
 ```
 import os
 import sys
