@@ -1,19 +1,15 @@
-import numpy as np
 import pandas as pd
 
 from sklearn.preprocessing import Imputer, StandardScaler
-from sklearn.pipeline import Pipeline, FeatureUnion
-from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, make_scorer
 from sklearn.model_selection import StratifiedKFold
-from sklearn.feature_selection import SelectFromModel, RFECV
+from sklearn.feature_selection import SelectFromModel
 from sklearn.model_selection import cross_val_score
 
 from .preprocessing import preprocess
 from .preprocessing import run_feature_engineering
-from .preprocessing import feature_engineer_rent, feature_engineer_education, feature_engineer_demographics
-from .preprocessing import feature_engineer_house_rankings, feature_engineer_house_characteristics, feature_engineer_assets
-from .pipeline import FeatureEngineer
 from .pipeline import BaggedLGBMClassifier
 
 # Custom scorer for cross validation
@@ -21,49 +17,13 @@ f1_scorer = make_scorer(f1_score, greater_is_better=True, average='macro')
 
 kfold = StratifiedKFold(n_splits=5, random_state=10)
 
-feature_extraction = FeatureUnion(transformer_list=[
-    ('extract_rent', FeatureEngineer(feature_engineer_rent)),
-    ('extract_educ', FeatureEngineer(feature_engineer_education)),
-    ('extract_demog', FeatureEngineer(feature_engineer_demographics)),
-    ('extract_houseq', FeatureEngineer(feature_engineer_house_rankings)),
-    ('extract_housec', FeatureEngineer(feature_engineer_house_characteristics)),
-    ('extract_assets', FeatureEngineer(feature_engineer_assets))
-])
-
-transformer_pipeline = Pipeline(steps=[
-                        ('features', feature_extraction),
-                        ('imputer', Imputer(strategy='mean')),
-                        ('feature_scaler', StandardScaler()),
-                        ])
-
-pipeline_rf = Pipeline(steps=[
-                        ('features', feature_extraction),
-                        ('imputer', Imputer(strategy='mean')),
-                        ('feature_scaler', StandardScaler()),
-                        ('random_forest', RandomForestClassifier(random_state=1))])
-
-# clf = ExtraTreesClassifier(random_state=1, max_depth=10, n_estimators=100, n_jobs=-1)
-# clf = ExtraTreesClassifier(random_state=10, n_estimators=100, n_jobs=-1)
-clf = RandomForestClassifier(n_estimators=100, max_depth=10)
-# clf = BaggedLGBMClassifier(random_state=1)
+clf = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=1)
 pipeline = Pipeline(steps=[
                         ('imputer', Imputer(strategy='mean')),
                         ('feature_scaler', StandardScaler()),
-                        ('selector', SelectFromModel(clf, threshold=0.012)), #threshold=0.007
-                        # ('selector', RFECV(clf, step=5, cv=kfold, scoring=f1_scorer, min_features_to_select=10, n_jobs=-1)),
+                        ('selector', SelectFromModel(clf, threshold=0.012)),
                         ('model', BaggedLGBMClassifier(random_state=10)),
                         ])
-
-LEVELS = ['low', 'medium']
-DEPTHS = [20, 30, 40]
-param_grid_rf = dict(features__extract_educ__level=LEVELS,
-                 features__extract_rent__level=LEVELS,
-                 features__extract_demog__level=LEVELS,
-                 features__extract_houseq__level=LEVELS,
-                 features__extract_housec__level=LEVELS,
-                 features__extract_assets__level=LEVELS,
-                 random_forest__max_depth=DEPTHS,
-                 )
 
 
 def load_and_process_training_data(engineer_features=True, subset_to_hh=True):
